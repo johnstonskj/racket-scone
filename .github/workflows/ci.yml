@@ -1,5 +1,5 @@
 on: [push, pull_request]
-name: CI
+name: Racket
 jobs:
   build:
     name: "Build on Racket '${{ matrix.racket-version }}' (${{ matrix.racket-variant }})"
@@ -21,9 +21,12 @@ jobs:
           distribution: full
           variant: ${{ matrix.racket-variant }}
           version: ${{ matrix.racket-version }}
-      - name: Installing scoff and its dependencies
-        run: raco pkg install --no-docs --auto --name scoff
-      - name: Compiling scoff and building its docs
-        run: raco setup --check-pkg-deps --unused-pkg-deps scoff
-      - name: Testing scoff
-        run: raco test -x -p scoff
+          
+      - name: Installing scone and its dependencies
+        run: raco pkg install --no-docs --auto --name scone
+        
+      - name: Compiling scone and building its docs
+        run: raco setup --check-pkg-deps --unused-pkg-deps scone
+
+      - name: Testing scone
+        run: raco test -x -p scone
