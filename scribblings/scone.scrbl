@@ -9,6 +9,7 @@
             (struct:table struct:html-table)
             (table? html-table?)
             (table-columns html-table-columns))
+          scribble/decode
           scribble/examples
           
           scone
@@ -20,6 +21,12 @@
                      
 @;{============================================================================}
 
+@(define (section** . strs) (larger (larger (bold strs))))
+
+@(define (subsection** . strs) (larger (bold strs)))
+
+@(define (subsubsection** . strs) (bold strs))
+         
 @(define example-eval (make-base-eval
                       '(require racket/string
                                 scone scone/io scone/query)))
@@ -37,7 +44,7 @@ types such as CSV or JSON where simple tabular data is stored or exchanged.
 This package provides the core data types as well as read and write
 capabilities and simple query over the in-memory representation.
 
-@bold{Example}
+@subsection**{Example}
 
 @examples[
 #:eval example-eval
@@ -56,6 +63,20 @@ capabilities and simple query over the in-memory representation.
 
 (describe selected)
 ]
+
+@subsection**{Why another File Format?}
+
+@margin-note{
+@secref["reader" #:doc '(lib "scribblings/reference/reference.scrbl")] in
+@other-doc['(lib "scribblings/reference/reference.scrbl")] introduces the
+Racket reader.
+}
+
+Simplicity. I didn't want to write a lexer/parser when Racket/Scheme has a
+perfectly good one already in the @italic{reader}. Use a simple set of types,
+simple serialization and some high-level tools and it just works.
+
+@subsection**{Contents}
 
 @local-table-of-contents[]
 

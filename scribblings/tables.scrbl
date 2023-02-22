@@ -9,6 +9,7 @@
             (struct:table struct:html-table)
             (table? html-table?)
             (table-columns html-table-columns))
+          scribble/decode
           scribble/examples
           
           scone
@@ -20,6 +21,12 @@
                      
 @;{============================================================================}
 
+@(define (section** . strs) (larger (larger (bold strs))))
+
+@(define (subsection** . strs) (larger (bold strs)))
+
+@(define (subsubsection** . strs) (bold strs))
+ 
 @(define example-eval (make-base-eval
                       '(require racket/string
                                 scone)))
@@ -52,7 +59,7 @@ main data.
   definition and each value @bold{must} conform to the corresponding
   @secref["Column_Definition"]. 
 
-@bold{Layout}
+@subsection**{Layout}
 
 @verbatim|{
 ,-------------------------------------------------------------------,
@@ -78,7 +85,7 @@ main data.
   every value @bold{must} conform to the corresponding
   @secref["Column_Definition"]. 
 
-@bold{Layout}
+@subsection**{Layout}
 
 @verbatim|{
 ,----------------------------------------------------------,

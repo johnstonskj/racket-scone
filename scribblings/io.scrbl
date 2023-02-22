@@ -8,6 +8,7 @@
             (struct:table struct:html-table)
             (table? html-table?)
             (table-columns html-table-columns))
+          scribble/decode
           scribble/examples
           
           scone
@@ -21,6 +22,12 @@
                      
 @;{============================================================================}
 
+@(define (section** . strs) (larger (larger (bold strs))))
+
+@(define (subsection** . strs) (larger (bold strs)))
+
+@(define (subsubsection** . strs) (bold strs))
+ 
 @(define example-eval (make-base-eval
                       '(require racket/string
                                 scone scone/io scone/query)))
@@ -115,7 +122,7 @@ following is a legal serialized table.
   default numeric values are right-aligned, strings and symbols are left-
   aligned and booleans are centered.
 
-@bold{Example}
+@subsection**{Example}
 
 @examples[
 #:label #f

@@ -8,6 +8,7 @@
             (struct:table struct:html-table)
             (table? html-table?)
             (table-columns html-table-columns))
+          scribble/decode
           scribble/examples
           
           scone
@@ -20,6 +21,12 @@
                      
 @;{============================================================================}
 
+@(define (section** . strs) (larger (larger (bold strs))))
+
+@(define (subsection** . strs) (larger (bold strs)))
+
+@(define (subsubsection** . strs) (bold strs))
+ 
 @(define example-eval (make-base-eval
                       '(require racket/string
                                 scone scone/io scone/query)))
@@ -68,7 +75,7 @@
 
   The @racket[as-table-name] value is used as the name of the resulting table.
 
-@bold{Example 1 - select all}
+@subsection**{Example 1 - select all}
 
 In this case the SQL @tt{'*'} is represented as the value @racket[#t] as the value
 for @racket[columns]. As this is the default value for the parameter it can
@@ -84,7 +91,7 @@ Note that the @racket[from] parameter is always required.
 (select #:from names-list)
 ]
 
-@bold{Example 2 - projection}
+@subsection**{Example 2 - projection}
 
 Projection, the alteration of the table structure, can be achieved by providing
 a list of @racket[column-name/c]s.
@@ -97,7 +104,7 @@ SELECT name, code_point FROM names_list;
 (select '(name code-point) #:from names-list)
 ]
 
-@bold{Example 3 - selection}
+@subsection**{Example 3 - selection}
 
 Selection, the filtering of the table rows, is achieved by providing a filter
 predicate. It is called with the values of the row as individual parameters
@@ -118,7 +125,7 @@ list in the same order.
         #:where (λ (cp . __) (< cp 256)))
 ]
 
-@bold{Example 4 - sorting}
+@subsection**{Example 4 - sorting}
 
 Sorting the projection and selection results is simple, adding an order-by
 clause.
@@ -137,7 +144,7 @@ Right now the implementation only supports sorting by a single column.
         #:order-by 'name)
 ]
 
-@bold{Example 5 - sorting with explicit ordering}
+@subsection**{Example 5 - sorting with explicit ordering}
 
 The need to sort by either ascending or descending order is similar except
 that the @racket[select] procedure now takes a @racket[pair] rather than
@@ -155,7 +162,7 @@ ORDER BY name DESC;
         #:order-by '(name . desc))
 ]
 
-@bold{Example 6 - create table as}
+@subsection**{Example 6 - create table as}
 
 In SQL the results of a select statement are a temporary value that has to
 be explicitly converted to be treated as a table.
@@ -179,7 +186,7 @@ the @racket[name] property of the result's table definition.
         #:as 'ascii)
 ]
 
-@bold{Example 7 - paginated results}
+@subsection**{Example 7 - paginated results}
 
 The @racket[offset] (where to start) and @racket[limit] (number of rows)
 together are useful in producing pages of results.
@@ -227,7 +234,7 @@ ORDER BY name DESC
   any]{
   Describe the table in a SQL-like DDL form.
 
-@bold{Example}
+@subsection**{Example}
 
 @examples[
 #:label #f
