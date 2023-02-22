@@ -6,14 +6,24 @@
  (contract-out
   [order-by-direction/c contract?]
   
+  [from-clause/c contract?]
+  [projection-clause/c contract?]
+  [selection-clause/c contract?]
+  [order-by-clause/c contract?]
+  [limit-clause/c contract?]
+  [offset-clause/c contract?]
+  [as-table-clause/c contract?]
+  
+  [default-order-by-direction (parameter/c order-by-direction/c)]
+    
   [select
-   (->* (#:from table?)
-        ((or/c (listof column-name/c) #t)
-         #:where (or/c procedure? #f)
-         #:order-by
-         (or/c column-name/c (cons/c column-name/c order-by-direction/c) #f)
-         #:limit (or/c exact-positive-integer? #f)
-         #:as (or/c table-name/c #f))
+   (->* (#:from from-clause/c)
+        (projection-clause/c
+         #:where selection-clause/c
+         #:order-by order-by-clause/c
+         #:limit limit-clause/c
+         #:offset offset-clause/c
+         #:as as-table-clause/c)
         table?)]
   
   [pivot-table->columnar (-> table? columnar-table?)]
@@ -36,11 +46,6 @@
 
 (define order-by-direction/c
   (flat-named-contract 'order-by-direction (or/c 'asc 'desc)))
-
-(define/contract
-  (check-order-by-direction v)
-  (-> order-by-direction/c order-by-direction/c)
-  v)
 
 (define (symbol<? lhs rhs) (string<? (symbol->string lhs) (symbol->string rhs)))
 
@@ -95,18 +100,23 @@
   (let ([order-by-index (table-column-index table order-by)])
     (member-index order-by-index projection)))
 
-(define (query [columns #t] #:from from #:where [where #f] #:order-by [order-by #f]
-               #:limit [limit #f])
-  (unless (table? from)
-    (error "need to select from a sdf-table" from))
+(define (query [columns #t]
+               #:from from
+               #:where [where #f]
+               #:order-by [order-by #f]
+               #:limit [limit #f]
+               #:offset [offset 0])
   (let ([projection (make-projection from columns)])
     (let* ([selection (filter-map
                        (λ (row) (select-where row projection where))
                        (table-rows from))]
-           [limited (if (or (false? limit)
-                            (and (exact-nonnegative-integer? limit) (> limit (length selection))))
-                          selection
-                          (take selection limit))])
+           [offset (cond
+                    ((= offset 0) selection)
+                    ((>= offset (length selection)) '())
+                    (else (drop selection offset)))]
+           [limited (if (or (false? limit) (> limit (length offset)))
+                        offset
+                        (take offset limit))])
       (values
        (projection->tabledef from columns)
        (cond
@@ -158,17 +168,33 @@
 ;; Public Stuff
 ;; -------------------------------------------------------------------------------------
 
-(define default-order-by-direction
-  (make-parameter 'asc check-order-by-direction))
+(define default-order-by-direction (make-parameter 'asc))
+
+(define from-clause/c table?)
+
+(define projection-clause/c (or/c (listof column-name/c) #t))
+
+(define selection-clause/c (or/c procedure? #f))
+
+(define order-by-clause/c (or/c column-name/c
+               (cons/c column-name/c order-by-direction/c)
+               #f))
+
+(define limit-clause/c (or/c exact-positive-integer? #f))
+
+(define offset-clause/c exact-nonnegative-integer?)
+
+(define as-table-clause/c (or/c table-name/c #f))
 
 (define (select [columns #t]
                 #:from from
                 #:where [where #f]
                 #:order-by [order-by #f]
                 #:limit [limit #f]
+                #:offset [offset 0]
                 #:as [as-table-name #f])
   (let-values ([(def rows)
-                (query columns #:from from #:where where #:order-by order-by #:limit limit)])
+                (query columns #:from from #:where where #:order-by order-by #:limit limit #:offset offset)])
     (make-table (make-tabledef
                  def
                  (if (symbol? as-table-name) as-table-name (next-table-name)))

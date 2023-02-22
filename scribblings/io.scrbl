@@ -169,7 +169,7 @@ following is a legal serialized table.
 
 @defproc[
   #:kind "contract"
-  (file-extension/c [maybe-file-extension any/c])
+  (file-extension/c [value any/c])
   boolean?]{
   ...
 }
