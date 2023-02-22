@@ -5,7 +5,7 @@
 (define pkg-authors '(johnstonskj))
 (define license '(Apache-2.0 OR MIT))
 
-(define deps '("base"))
+(define deps '("base" "text-table"))
 (define build-deps '("sandbox-lib" "scribble-lib" "racket-doc" "rackunit-lib"))
 
 (define scribblings '(("scribblings/scone.scrbl" (multi-page))))

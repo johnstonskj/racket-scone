@@ -1,41 +1,67 @@
 #lang racket/base
 
+(require racket/contract/base)
+
 (provide
- data-type/c
- table-type/c
- table-name/c
- column-name/c
+ (contract-out
+  [data-type/c contract?]
+  [table-type/c contract?]
+  [table-name/c contract?]
+  [column-name/c contract?]
+  [value/c contract?]
+  [row/c contract?]
+  [columndef-from/c contract?]
  
- default-column-prefix
- default-column-data-type
- default-table-name
+  [default-column-prefix (parameter/c column-name/c)]
+  [default-column-data-type (parameter/c data-type/c)]
+  [default-table-name (parameter/c table-name/c)]
 
- (except-out (struct-out columndef) columndef)
- make-columndef
- make-columndef-from
+  [make-columndef (->* (column-name/c) (data-type/c boolean?) columndef?)]
+  [make-columndef-from (-> value/c exact-nonnegative-integer? columndef?)]
+  [columndef? predicate/c]
+  [columndef-name (-> columndef? column-name/c)]
+  [columndef-data-type (-> columndef? data-type/c)]
+  [columndef-is-list (-> columndef? boolean?)]
 
- (except-out (struct-out tabledef) tabledef)
- make-tabledef
- make-tabledef-from
- tabledef-column-count
- tabledef-column-def
- tabledef-column-index
+  [make-tabledef (->* ((listof columndef-from/c)) (table-name/c) tabledef?)]
+  [make-tabledef-from (-> row/c tabledef?)]
+  [tabledef? predicate/c]
+  [tabledef-name (-> tabledef? table-name/c)]
+  [tabledef-columns (-> tabledef? (listof columndef?))]
+  [tabledef-column-count (-> tabledef? (or/c exact-nonnegative-integer? #f))]
+  [tabledef-has-column? (-> tabledef? column-name/c boolean?)]
+  [tabledef-column-def
+   (-> tabledef?
+       column-name/c
+       (or/c (cons/c exact-nonnegative-integer? columndef?) #f))]
+  [tabledef-column-index
+   (-> tabledef? column-name/c exact-nonnegative-integer?)]
 
- (except-out (struct-out table) table)
- (rename-out (table make-table))
+  [make-table (-> tabledef? (listof row/c) table?)]
+  [table? predicate/c]
+  [table-def (-> table? tabledef?)]
+  [table-rows (-> table? (listof row/c))]
 
- (except-out (struct-out columnar-table) columnar-table)
- (rename-out (columnar-table make-columnar-table))
+  [make-columnar-table (-> tabledef? (listof row/c) columnar-table?)]
+  [columnar-table? predicate/c]
+  [columnar-table-def (-> columnar-table? tabledef?)]
+  [columnar-table-columns (-> columnar-table? (vectorof (listof value/c)))]
+  
+  [table-name (-> table-type/c table-name/c)]
+  [table-columns (-> table-type/c (listof columndef?))]
+  [table-column-count (-> table-type/c exact-nonnegative-integer?)]
+  [table-has-column? (-> table-type/c column-name/c boolean?)]
+  [table-column-def
+   (-> table-type/c
+       column-name/c
+       (or/c (cons/c exact-nonnegative-integer? columndef?) #f))]
+  [table-column-index
+   (-> table-type/c column-name/c (or/c exact-nonnegative-integer? #f))]
+  [table-row-count (-> table-type/c exact-nonnegative-integer?)]
+  
+  [next-table-name (-> table-name/c)]
 
- table-name
- table-columns
- table-column-count
- table-column-def
- table-column-index
- table-row-count
- next-table-name
-
- row-validate)
+  [row-validate (-> tabledef? row/c row/c)]))
 
 (require
  racket/bool
@@ -47,23 +73,15 @@
 ;; -------------------------------------------------------------------------------------
 
 (define data-type/c
-  (flat-named-contract
-   'data-type
-   (lambda (v) (or (eq? v 'boolean) (eq? v 'number) (eq? v 'string) (eq? v 'symbol)))))
-
-(define/contract
-  (check-column-data-type type)
-  (-> data-type/c data-type/c)
-  type)
+  (flat-named-contract 'data-type (or/c 'boolean 'number 'string 'symbol)))
 
 (define (next-table-counter)
   (let ([i table-counter])
     (set! table-counter (add1 i))
     i))
 
-(define table-name/c (flat-named-contract 'table-name symbol?))
-
-(define/contract (check-table-name name) (-> table-name/c table-name/c) name)
+(define table-name/c
+  (flat-named-contract 'table-name symbol?))
 
 ;; Public ------------------------------------------------------------------------------
 
@@ -73,10 +91,10 @@
    (λ (p) (if (symbol? p) p (error "invalid type column prefix, expecting a symbol" p)))))
 
 (define default-column-data-type
-  (make-parameter 'string check-column-data-type))
+  (make-parameter 'string))
 
 (define default-table-name
-  (make-parameter 'unnamed check-table-name))
+  (make-parameter 'unnamed))
 
 (define table-counter 1)
 
@@ -85,10 +103,6 @@
 ;; -------------------------------------------------------------------------------------
 
 (define column-name/c (flat-named-contract 'column-name symbol?))
-
-(define/contract (check-column-name name) (-> column-name/c column-name/c) name)
-
-(define/contract (check-column-is-list is-list) (-> boolean? boolean?) is-list)
 
 (define (value->data-type value)
   (cond
@@ -100,13 +114,7 @@
 
 ;; Public ------------------------------------------------------------------------------
 
-(struct columndef (name data-type is-list)
-  #:transparent
-  #:guard (λ (name data-type is-list struct-name)
-            (values
-             (check-column-name name)
-             (check-column-data-type data-type)
-             (check-column-is-list is-list))))
+(struct columndef (name data-type is-list) #:transparent)
 
 (define (make-columndef name [data-type (default-column-data-type)] [is-list? #f])
   (columndef name data-type is-list?))
@@ -125,27 +133,25 @@
 ;; The Table Definition type
 ;; -------------------------------------------------------------------------------------
 
-(define/contract
-  (check-table-columns columns)
-  (-> (listof columndef?) (listof columndef?))
-  columns)
-
 (define (next-table-name)
-  (format "~a_~a" (default-table-name) (next-table-counter)))
+  (string->symbol (format "~a_~a" (default-table-name) (next-table-counter))))
 
 ;; Public ------------------------------------------------------------------------------
 
-(struct tabledef (name columns)
-  #:transparent
-  #:guard (λ (name columns struct-name)
-            (values
-             (check-table-name name)
-             (check-table-columns columns))))
+(struct tabledef (name columns) #:transparent)
 
-(define (make-tabledef columns [name #f])
+(define columndef-from/c
+  (or/c
+   columndef?
+   symbol?
+   (list/c symbol?)
+   (list/c symbol? data-type/c)
+   (list/c symbol? data-type/c boolean?)))
+
+(define (make-tabledef column-defs [name #f])
   (tabledef
-   (or name (string->symbol (next-table-name)))
-   (for/list ([column columns])
+   (or name (next-table-name))
+   (for/list ([column column-defs])
      (cond
        ((columndef? column) column)
        ((symbol? column) (make-columndef column))
@@ -161,88 +167,76 @@
 (define (tabledef-column-count def)
   (length (tabledef-columns def)))
 
+(define (tabledef-has-column? def name)
+    (if (tabledef-column-def def name) #t #f))
+
 (define (tabledef-column-def def name)
   (let next-column ([columns (tabledef-columns def)] [index 0])
     (cond
-      ((null? columns) (error "table does not contain column" tabledef name))
-      ((symbol=? (columndef-name (first columns)) name) (values index (first columns)))
+      ((null? columns) (error "table does not contain column" def name))
+      ((symbol=? (columndef-name (first columns)) name) (cons index (first columns)))
       (else (next-column (rest columns) (add1 index))))))
 
 (define (tabledef-column-index def name)
-  (let-values ([(index _) (tabledef-column-def def name)])
-    index))
+  (let ([column-def (tabledef-column-def def name)])
+    (if column-def (car column-def) #f)))
 
 ;; -------------------------------------------------------------------------------------
 ;; The Table data type
 ;; -------------------------------------------------------------------------------------
 
-(struct table (def rows)
-  #:transparent
-  #:guard (λ (tabledef rows struct-name)
-            (values
-             (if (tabledef? tabledef)
-                 tabledef
-                 (error "expecting a tabledef" tabledef))
-             (if (list? rows)
-                 rows
-                 (error "expecting a list of rows" rows)))))
+(struct table (def rows) #:transparent)
+
+(define make-table table)
 
 ;; -------------------------------------------------------------------------------------
 ;; The Columnar Table data type
 ;; -------------------------------------------------------------------------------------
 
-(struct columnar-table (def columns)
-  #:transparent
-  #:guard (λ (def columns struct-name)
-            (values
-             (if (tabledef? def)
-                 def
-                 (error "cable: expecting a tabledef" def))
-             (if (vector? columns)
-                 columns
-                 (error "cable: expecting a vector of columns" columns)))))
+(struct columnar-table (def columns) #:transparent)
+
+(define make-columnar-table columnar-table)
 
 ;; -------------------------------------------------------------------------------------
 ;; Common Table/Cable procedures
 ;; -------------------------------------------------------------------------------------
 
 (define table-type/c
-  (flat-named-contract 'table-type (lambda (v) (or (table? v) (columnar-table? v)))))
+  (flat-named-contract 'table-type (or/c table? columnar-table?)))
 
 (define/contract (check-table-type v) (-> table-type/c table-type/c) v)
 
 (define (table-name table)
-  (check-table-type table)
   (cond
     ((columnar-table? table) (tabledef-name (columnar-table-def table)))
     ((table? table) (tabledef-name (table-def table)))
     (else (error "unreachable"))))
 
 (define (table-columns table)
-  (check-table-type table)
   (cond
     ((columnar-table? table) (tabledef-columns (columnar-table-def table)))
     ((table? table) (tabledef-columns (table-def table)))
     (else (error "table-columns: expecting either table or cable" table))))
 
 (define (table-column-count table)
-  (check-table-type table)
   (cond
     ((columnar-table? table) (length (tabledef-columns (columnar-table-def table))))
     ((table? table) (length (tabledef-columns (table-def table))))
     (else (error "table-column-count: expecting either table or cable" table))))
 
+(define (table-has-column? table name)
+  (cond
+    ((columnar-table? table) (tabledef-has-column? (columnar-table-def table) name))
+    ((table? table) (tabledef-has-column? (table-def table) name))
+    (else (error "table-has-column?: expecting either table or cable" table))))
+
 (define (table-column-def table name)
-  (check-table-type table)
-  (check-column-name name)
   (cond
     ((columnar-table? table) (tabledef-column-def (columnar-table-def table) name))
     ((table? table) (tabledef-column-def (table-def table) name))
     (else (error "table-column-def: expecting either table or cable" table))))
 
 (define (table-column-index table name)
-  (check-table-type table)
-  (check-column-name name)
   (cond
     ((columnar-table? table) (tabledef-column-index (columnar-table-def table) name))
     ((table? table) (tabledef-column-index (table-def table) name))
@@ -276,6 +270,13 @@
     (else (check-value-data-type (columndef-data-type columndef) data))))
 
 ;; Public ------------------------------------------------------------------------------
+
+(define value/c
+  (or/c
+   boolean? number? string? symbol?
+   (listof boolean?) (listof number?) (listof string?) (listof symbol?)))
+
+(define row/c (vectorof value/c))
 
 (define (row-validate tabledef row)
   (cond

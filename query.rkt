@@ -1,11 +1,27 @@
 #lang racket/base
 
-(provide
- select
- pivot
- describe
+(require racket/contract/base)
 
- order-by-direction/c)
+(provide
+ (contract-out
+  [order-by-direction/c contract?]
+  
+  [select
+   (->* (#:from table?)
+        ((or/c (listof column-name/c) #t)
+         #:where (or/c procedure? #f)
+         #:order-by
+         (or/c column-name/c (cons/c column-name/c order-by-direction/c) #f)
+         #:limit (or/c exact-positive-integer? #f)
+         #:as (or/c table-name/c #f))
+        table?)]
+  
+  [pivot-table->columnar (-> table? columnar-table?)]
+  
+  [pivot-columnar->table (-> columnar-table? table?)]
+  
+  [describe
+   (->* (table-type/c) (output-port?) any/c)]))
 
 (require
  racket/bool
@@ -19,7 +35,7 @@
 ;; -------------------------------------------------------------------------------------
 
 (define order-by-direction/c
-  (flat-named-contract 'order-by-direction (lambda (v) (or (eq? v 'asc) (eq? v 'desc)))))
+  (flat-named-contract 'order-by-direction (or/c 'asc 'desc)))
 
 (define/contract
   (check-order-by-direction v)
@@ -31,7 +47,7 @@
 (define (symbol>? lhs rhs) (string>? (symbol->string lhs) (symbol->string rhs)))
 
 (define (sort-rows table rows order-by index dir)
-  (let-values ([(_ column) (table-column-def table order-by)])
+  (let ([column (cdr (table-column-def table order-by))])
     (sort
      rows
      #:key (λ (row) (vector-ref row index))
@@ -64,7 +80,7 @@
     (cond
       ((eq? columns #t) tabledef)
       ((and (list? columns) (for/and ([column columns]) (symbol? column)))
-       (map (λ (c) (let-values ([(_ column) (tabledef-column-def tabledef c)]) column)) columns))
+       (map (λ (c) (let ([column (cdr (tabledef-column-def tabledef c))]) column)) columns))
       (else
        (error "projection is either a list of column names or #t" columns)))))
 
@@ -79,21 +95,28 @@
   (let ([order-by-index (table-column-index table order-by)])
     (member-index order-by-index projection)))
 
-(define (query [columns #t] #:from from #:where [where #f] #:order-by [order-by #f])
+(define (query [columns #t] #:from from #:where [where #f] #:order-by [order-by #f]
+               #:limit [limit #f])
   (unless (table? from)
     (error "need to select from a sdf-table" from))
   (let ([projection (make-projection from columns)])
-    (let ([selection (filter-map
-                      (λ (row) (select-where row projection where))
-                      (table-rows from))])
+    (let* ([selection (filter-map
+                       (λ (row) (select-where row projection where))
+                       (table-rows from))]
+           [limited (if (or (false? limit)
+                            (and (exact-nonnegative-integer? limit) (> limit (length selection))))
+                          selection
+                          (take selection limit))])
       (values
        (projection->tabledef from columns)
        (cond
-         ((false? order-by) selection)
+        ;; done.
+        ((false? order-by) limited)
+        ;; sort by column, default order
          ((symbol? order-by)
           (sort-rows
            from
-           selection
+           limited
            order-by
            (order-by-column-index
             from
@@ -102,10 +125,11 @@
                 (range (table-column-count from)))
             order-by)
            (default-order-by-direction)))
+         ;; sort by column and order
          ((and (pair? order-by) (symbol? (car order-by)) (symbol? (cdr order-by)))
           (sort-rows
            from
-           selection
+           limited
            (car order-by)
            (order-by-column-index
             from
@@ -128,7 +152,7 @@
                           (columndef-name column)
                           (if (columndef-is-list column) " LISTOF " " ")
                           (columndef-data-type column)) out))
-     (displayln ")\nSTORED AS SDF\nWITH HEADER ROW;" out))
+     (displayln ")\nSTORED AS scone\nWITH HEADER ROW;" out))
 
 ;; -------------------------------------------------------------------------------------
 ;; Public Stuff
@@ -141,15 +165,16 @@
                 #:from from
                 #:where [where #f]
                 #:order-by [order-by #f]
+                #:limit [limit #f]
                 #:as [as-table-name #f])
-  (let-values ([(def rows) (query columns #:from from #:where where #:order-by order-by)])
+  (let-values ([(def rows)
+                (query columns #:from from #:where where #:order-by order-by #:limit limit)])
     (make-table (make-tabledef
-                 (if (symbol? as-table-name) as-table-name (next-table-name))
-                 def)
+                 def
+                 (if (symbol? as-table-name) as-table-name (next-table-name)))
                 rows)))
 
-(define (pivot table)
-  ;; TODO: pivot columnar-table -> table
+(define (pivot-table->columnar table)
   (unless (table? table)
     (error "can only pivot a sdf-table" table))
   (make-columnar-table
@@ -160,8 +185,11 @@
      (make-list (table-column-count table) '())
      (table-rows table)))))
 
+(define (pivot-columnar->table table)
+  (error "not implemented yet"))
+
 (define (describe table [out (current-output-port)])
   (cond
-    ((columnar-table? table) (describe-tablelike (columnar-table-def table) #t) out)
-    ((table? table) (describe-tablelike (table-def table) #f) out)
+    ((columnar-table? table) (describe-tablelike (columnar-table-def table) #t out))
+    ((table? table) (describe-tablelike (table-def table) #f out))
     (else (error "describe: can't describe a non-table" table))))

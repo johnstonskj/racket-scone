@@ -6,7 +6,7 @@
  scone/query)
 
 
-(define names-list (read-table-from-file "names-list.scoff"))
+(define names-list (read-table-from-file "names-list.scone"))
 
 (describe names-list)
 
@@ -22,7 +22,7 @@
 
 ;;(write-table-to-file selected #:exists 'replace)
 
-(define pivoted (pivot selected))
+(define pivoted (pivot-table->columnar selected))
 
 (describe pivoted)
 
