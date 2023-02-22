@@ -41,6 +41,9 @@ capabilities and simple query over the in-memory representation.
 
 ## Why another File Format?
 
+Simplicity. I didn't want to write a lexer/parser when Racket/Scheme has a
+perfectly good one already in the *reader*. Use a simple set of types, simple
+serialization and some high-level tools and it just works.
 
 ## Changes
 
