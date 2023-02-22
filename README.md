@@ -5,10 +5,11 @@ strict subset of the Scheme language and is intended to be parsed directly by
 the Scheme reader. The intent is to be a Scheme-friendly replacement for file
 types such as CSV or JSON where simple tabular data is stored or exchanged.
 
+[![Racket](https://github.com/johnstonskj/racket-scone/actions/workflows/ci.yml/badge.svg)](https://github.com/johnstonskj/racket-scone/actions/workflows/ci.yml)
 [![raco pkg install codepoint](https://img.shields.io/badge/raco%20pkg%20install-scone-blue.svg)](https://pkgs.racket-lang.org/package/scone)
 [![Documentation](https://img.shields.io/badge/raco%20docs-scone-blue.svg)](http://docs.racket-lang.org/scone/index.html)
 [![GitHub stars](https://img.shields.io/github/stars/johnstonskj/racket-scone.svg)](https://github.com/johnstonskj/racket-scone/stargazers)
-![MIT/Apache-2.0 License](https://img.shields.io/badge/license-MIT%2FApache--2.0-118811.svg)
+![MIT/Apache-2.0 License](https://img.shields.io/badge/license-MIT%2FApache--2.0-green.svg)
 
 This package provides the core data types as well as read and write
 capabilities and simple query over the in-memory representation.
